@@ -10,11 +10,20 @@ if [[ ${EUID:-$(id -u)} -ne 0 ]]; then
   exit 1
 fi
 
+pick_branch_with_installer() {
+  git -C "$TARGET_DIR" for-each-ref --format='%(refname:short)' refs/remotes/origin \
+    | sed 's#^origin/##' \
+    | while read -r b; do
+        git -C "$TARGET_DIR" ls-tree -r --name-only "origin/$b" -- setup.sh bootstrap.sh \
+          | grep -Eq '^(setup.sh|bootstrap.sh)$' && { echo "$b"; break; }
+      done
+}
+
 if [[ -d "$TARGET_DIR/.git" ]]; then
   echo "[bootstrap] bestehendes Repo gefunden: $TARGET_DIR"
   git -C "$TARGET_DIR" fetch --all --prune
-  git -C "$TARGET_DIR" checkout "$BRANCH"
-  git -C "$TARGET_DIR" reset --hard "origin/$BRANCH"
+  git -C "$TARGET_DIR" checkout "$BRANCH" || true
+  git -C "$TARGET_DIR" reset --hard "origin/$BRANCH" || true
 elif [[ -d "$TARGET_DIR" ]] && [[ -n "$(find "$TARGET_DIR" -mindepth 1 -maxdepth 1 2>/dev/null)" ]]; then
   cat >&2 <<MSG
 [bootstrap] FEHLER: $TARGET_DIR existiert, ist aber kein Git-Checkout.
@@ -29,6 +38,14 @@ else
 fi
 
 cd "$TARGET_DIR"
+
+if [[ ! -x ./setup.sh && ! -x ./install.sh && ! -x ./scripts/install.sh ]]; then
+  CANDIDATE="$(pick_branch_with_installer || true)"
+  if [[ -n "$CANDIDATE" ]]; then
+    echo "[bootstrap] Installer auf origin/$CANDIDATE gefunden, wechsle Branch."
+    git -C "$TARGET_DIR" checkout "$CANDIDATE"
+  fi
+fi
 
 if [[ -x ./setup.sh ]]; then
   exec ./setup.sh

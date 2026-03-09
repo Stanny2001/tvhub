@@ -20,7 +20,7 @@ Empfohlen (robust, auch wenn `/opt/tvhub` bereits existiert):
 
 ```bash
 apt-get update && apt-get install -y git curl
-bash -c 'set -e; if [ -d /opt/tvhub/.git ]; then git -C /opt/tvhub fetch --all --prune && git -C /opt/tvhub checkout main && git -C /opt/tvhub reset --hard origin/main; else rm -rf /opt/tvhub && git clone https://github.com/Stanny2001/tvhub.git /opt/tvhub; fi; cd /opt/tvhub; ./bootstrap.sh'
+bash -c 'set -e; if [ -d /opt/tvhub/.git ]; then git -C /opt/tvhub fetch --all --prune; git -C /opt/tvhub checkout main || true; git -C /opt/tvhub reset --hard origin/main || true; else rm -rf /opt/tvhub; git clone https://github.com/Stanny2001/tvhub.git /opt/tvhub; fi; if [ ! -x /opt/tvhub/bootstrap.sh ] && [ ! -x /opt/tvhub/setup.sh ]; then CANDIDATE=$(git -C /opt/tvhub for-each-ref --format="%(refname:short)" refs/remotes/origin | sed "s#^origin/##" | while read -r b; do git -C /opt/tvhub ls-tree -r --name-only "origin/$b" -- setup.sh bootstrap.sh | grep -Eq "^(setup.sh|bootstrap.sh)$" && { echo "$b"; break; }; done); [ -n "$CANDIDATE" ] && git -C /opt/tvhub checkout "$CANDIDATE"; fi; cd /opt/tvhub; [ -x ./bootstrap.sh ] && exec ./bootstrap.sh; [ -x ./setup.sh ] && exec ./setup.sh; [ -x ./install.sh ] && exec ./install.sh; exec ./scripts/install.sh'
 ```
 
 Klassisch (frischer Host ohne vorhandenes `/opt/tvhub`):
@@ -88,10 +88,11 @@ curl -I http://127.0.0.1:8080/pluto_stable.m3u
   - In TVHeadend Muxes/Networks rescan, ggf. IPTV Auto-Refresh anstoßen.
 - **`fatal: destination path 'tvhub' already exists` + `./setup.sh: No such file`**
   - Das passiert, wenn `git clone` fehlschlägt und du danach in einem alten/unvollständigen Ordner landest.
-  - Fix (hartes Update auf aktuellen Stand):
+  - Zusätzlich kann `origin/main` noch auf einem Minimal-Commit stehen, in dem `setup.sh/bootstrap.sh` fehlen.
+  - Fix (holt zuerst alles und wechselt bei Bedarf automatisch auf einen Branch mit Installer-Dateien):
     ```bash
     apt-get update && apt-get install -y git curl
-    bash -c 'set -e; if [ -d /opt/tvhub/.git ]; then git -C /opt/tvhub fetch --all --prune && git -C /opt/tvhub checkout main && git -C /opt/tvhub reset --hard origin/main; else rm -rf /opt/tvhub && git clone https://github.com/Stanny2001/tvhub.git /opt/tvhub; fi; cd /opt/tvhub; ./bootstrap.sh'
+    bash -c 'set -e; if [ -d /opt/tvhub/.git ]; then git -C /opt/tvhub fetch --all --prune; git -C /opt/tvhub checkout main || true; git -C /opt/tvhub reset --hard origin/main || true; else rm -rf /opt/tvhub; git clone https://github.com/Stanny2001/tvhub.git /opt/tvhub; fi; if [ ! -x /opt/tvhub/bootstrap.sh ] && [ ! -x /opt/tvhub/setup.sh ]; then CANDIDATE=$(git -C /opt/tvhub for-each-ref --format="%(refname:short)" refs/remotes/origin | sed "s#^origin/##" | while read -r b; do git -C /opt/tvhub ls-tree -r --name-only "origin/$b" -- setup.sh bootstrap.sh | grep -Eq "^(setup.sh|bootstrap.sh)$" && { echo "$b"; break; }; done); [ -n "$CANDIDATE" ] && git -C /opt/tvhub checkout "$CANDIDATE"; fi; cd /opt/tvhub; [ -x ./bootstrap.sh ] && exec ./bootstrap.sh; [ -x ./setup.sh ] && exec ./setup.sh; [ -x ./install.sh ] && exec ./install.sh; exec ./scripts/install.sh'
     ```
 
 ## Update
