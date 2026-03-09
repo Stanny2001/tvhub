@@ -29,6 +29,6 @@ Bitte prüfen:
      rm -rf tvhub
      git clone https://github.com/Stanny2001/tvhub.git
      cd tvhub
-     ./setup.sh
+     ./bootstrap.sh
 MSG
 exit 1

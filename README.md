@@ -16,6 +16,15 @@ One-command Setup für einen **frischen Ubuntu-Container**:
 
 ## One-command Installation (frischer Container)
 
+Empfohlen (robust, auch wenn `/opt/tvhub` bereits existiert):
+
+```bash
+apt-get update && apt-get install -y git curl
+bash -c 'set -e; if [ -d /opt/tvhub/.git ]; then git -C /opt/tvhub fetch --all --prune && git -C /opt/tvhub checkout main && git -C /opt/tvhub reset --hard origin/main; else rm -rf /opt/tvhub && git clone https://github.com/Stanny2001/tvhub.git /opt/tvhub; fi; cd /opt/tvhub; ./bootstrap.sh'
+```
+
+Klassisch (frischer Host ohne vorhandenes `/opt/tvhub`):
+
 ```bash
 apt-get update && apt-get install -y git
 cd /opt
@@ -77,6 +86,13 @@ curl -I http://127.0.0.1:8080/pluto_stable.m3u
   - Diagnostics ausführen und Stable Playlist verwenden.
 - **TVHeadend cached alte Playlist**
   - In TVHeadend Muxes/Networks rescan, ggf. IPTV Auto-Refresh anstoßen.
+- **`fatal: destination path 'tvhub' already exists` + `./setup.sh: No such file`**
+  - Das passiert, wenn `git clone` fehlschlägt und du danach in einem alten/unvollständigen Ordner landest.
+  - Fix (hartes Update auf aktuellen Stand):
+    ```bash
+    apt-get update && apt-get install -y git curl
+    bash -c 'set -e; if [ -d /opt/tvhub/.git ]; then git -C /opt/tvhub fetch --all --prune && git -C /opt/tvhub checkout main && git -C /opt/tvhub reset --hard origin/main; else rm -rf /opt/tvhub && git clone https://github.com/Stanny2001/tvhub.git /opt/tvhub; fi; cd /opt/tvhub; ./bootstrap.sh'
+    ```
 
 ## Update
 
@@ -89,4 +105,4 @@ git pull
 ## Dateien
 - Pluto service: `systemd/plutotv.service`
 - WebUI service: `systemd/pluto-gateway-ui.service`
-- Installer: `setup.sh`, `install.sh`, `scripts/install.sh`
+- Installer: `bootstrap.sh`, `setup.sh`, `install.sh`, `scripts/install.sh`
