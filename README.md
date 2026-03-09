@@ -23,24 +23,35 @@ Robustes FastAPI-WebUI für einen PlutoTV-Localserver (Perl/systemd) im Ubuntu-C
 - `POST /api/stable-playlist/generate`
 - `GET /pluto_stable.m3u`
 
-## Schritt-für-Schritt Installation (Ubuntu 22.04/24.04)
-1. **Code in den Container kopieren** (z. B. nach `/workspace/tvhub`).
-2. **Als root installieren:**
+## Schritt-für-Schritt Installation (Ubuntu 22.04/24.04) – mit GitHub-Datenholung
+1. **Git installieren (falls noch nicht vorhanden):**
    ```bash
-   cd /workspace/tvhub
+   apt-get update
+   apt-get install -y git
+   ```
+2. **Repository von GitHub holen:**
+   ```bash
+   cd /opt
+   git clone https://github.com/Stanny2001/tvhub.git
+   cd tvhub
+   ```
+   > Optional: Wenn du einen bestimmten Branch nutzen willst:
+   > `git checkout <branch-name>`
+3. **Als root installieren:**
+   ```bash
    ./scripts/install.sh
    ```
-3. **Prüfen, ob Services laufen:**
+4. **Prüfen, ob Services laufen:**
    ```bash
    systemctl status plutotv
    systemctl status pluto-gateway-ui
    ```
-4. **API Schnelltest:**
+5. **API Schnelltest:**
    ```bash
    curl -s http://127.0.0.1:8788/api/health
    curl -s http://127.0.0.1:8788/api/status
    ```
-5. **WebUI öffnen:**
+6. **WebUI öffnen:**
    - `http://CONTAINER_IP:8788`
 
 ## TVHeadend eintragen
