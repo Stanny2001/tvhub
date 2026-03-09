@@ -1,0 +1,3 @@
+# Allow limited command execution for pluto gateway ui service user
+Cmnd_Alias PLUTO_CMDS = /bin/systemctl restart plutotv, /bin/systemctl status plutotv *, /bin/systemctl is-active plutotv, /bin/journalctl -u plutotv *
+__SERVICE_USER__ ALL=(root) NOPASSWD: PLUTO_CMDS

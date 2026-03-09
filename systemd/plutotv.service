@@ -1,0 +1,14 @@
+[Unit]
+Description=PlutoTV Localserver for TVHeadend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/plutotv-tvheadend
+ExecStart=/usr/bin/perl /opt/plutotv-tvheadend/plutotv-localserver.pl
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

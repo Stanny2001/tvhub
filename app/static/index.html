@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pluto Gateway UI</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f7f7f7; }
+    .tabs button { margin-right: 8px; padding: 8px 10px; }
+    .card { background: white; border-radius: 8px; padding: 12px; margin-top: 12px; }
+    .ok { color: green; }
+    .fail { color: #b00020; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ddd; padding: 6px; font-size: 14px; }
+    pre { background: #111; color: #d7ffd7; padding: 12px; max-height: 360px; overflow: auto; }
+    label { display: block; margin-top: 6px; }
+    input[type="text"], input[type="number"] { min-width: 280px; }
+  </style>
+</head>
+<body>
+  <h1>PlutoTV → TVHeadend Gateway</h1>
+  <div class="tabs">
+    <button onclick="showTab('dashboard')">Dashboard</button>
+    <button onclick="showTab('settings')">Settings</button>
+    <button onclick="showTab('logs')">Logs</button>
+    <button onclick="showTab('diag')">Diagnostics</button>
+  </div>
+
+  <div id="dashboard" class="card"></div>
+  <div id="settings" class="card" style="display:none"></div>
+  <div id="logs" class="card" style="display:none"></div>
+  <div id="diag" class="card" style="display:none"></div>
+
+<script>
+const tabs = ['dashboard','settings','logs','diag'];
+function showTab(name){ tabs.forEach(t=>document.getElementById(t).style.display=t===name?'block':'none'); }
+
+async function api(url, opts={}){
+  const r = await fetch(url, opts);
+  if(!r.ok){ throw new Error(await r.text()); }
+  return r.json();
+}
+
+async function renderDashboard(){
+  const st = await api('/api/status');
+  const svc = st.pluto_service;
+  document.getElementById('dashboard').innerHTML = `
+    <h2>Status</h2>
+    <p>Service: <b class="${svc.active?'ok':'fail'}">${svc.active?'RUNNING':'DOWN'}</b> (${svc.name})</p>
+    <p>M3U: <b class="${st.checks.m3u.ok?'ok':'fail'}">${st.checks.m3u.ok?'OK':'FAIL'}</b> (${st.checks.m3u.status_code||st.checks.m3u.error||'-'})</p>
+    <p>EPG: <b class="${st.checks.epg.ok?'ok':'fail'}">${st.checks.epg.ok?'OK':'FAIL'}</b> (${st.checks.epg.status_code||st.checks.epg.error||'-'})</p>
+    <p>Region: ${st.pluto.region} / Port: ${st.pluto.port} / Channels: ${st.pluto.channels_count}</p>
+    <p>UI uptime: ${st.ui_uptime_seconds}s</p>
+    <p>Listeners: ${(st.ports.listeners || []).join('<br/>') || '-'}</p>
+    <button onclick="restartService()">Restart Pluto Service</button>
+    <button onclick="renderDashboard()">Refresh</button>
+  `;
+}
+
+async function restartService(){
+  try {
+    await api('/api/restart', {method:'POST'});
+    alert('Pluto service restarted.');
+    await renderDashboard();
+  } catch(e) {
+    alert('Restart failed: '+e.message);
+  }
+}
+
+async function renderSettings(){
+  const c = await api('/api/config');
+  document.getElementById('settings').innerHTML = `
+    <h2>Settings</h2>
+    <label>Region <input id="region" value="${c.region}" /></label>
+    <label>Bind address <input id="bind_addr" value="${c.bind_addr}" /></label>
+    <label>Port <input id="port" type="number" value="${c.port}" /></label>
+    <label>Cache TTL <input id="cache_ttl" type="number" value="${c.cache_ttl}" /></label>
+    <label>User-Agent <input id="user_agent" value="${c.user_agent}" /></label>
+    <label>EPG refresh <input id="epg_refresh" type="number" value="${c.epg_refresh}" /></label>
+    <label>Logging level <input id="logging_level" value="${c.logging_level}" /></label>
+    <label>Enable stream proxy <input id="enable_stream_proxy" type="checkbox" ${c.enable_stream_proxy?'checked':''} /></label>
+    <button onclick="saveSettings()">Save</button>
+  `;
+}
+
+async function saveSettings(){
+  const body = {
+    region: document.getElementById('region').value,
+    bind_addr: document.getElementById('bind_addr').value,
+    port: Number(document.getElementById('port').value),
+    cache_ttl: Number(document.getElementById('cache_ttl').value),
+    user_agent: document.getElementById('user_agent').value,
+    epg_refresh: Number(document.getElementById('epg_refresh').value),
+    logging_level: document.getElementById('logging_level').value,
+    enable_stream_proxy: document.getElementById('enable_stream_proxy').checked,
+  };
+  await api('/api/config', {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  alert('Settings saved.');
+}
+
+let logPage = 1;
+async function renderLogs(){
+  const q = encodeURIComponent((document.getElementById('log_filter')?.value || '').trim());
+  const data = await api(`/api/logs?since=2%20hours%20ago&page=${logPage}&page_size=120&q=${q}`);
+  document.getElementById('logs').innerHTML = `
+    <h2>Logs</h2>
+    <label>Filter <input id="log_filter" type="text" value="${decodeURIComponent(q)}" /></label>
+    <button onclick="logPage=Math.max(1,logPage-1);renderLogs()">Prev</button>
+    <button onclick="logPage=logPage+1;renderLogs()">Next</button>
+    <button onclick="logPage=1;renderLogs()">Apply filter / Refresh</button>
+    <p>Page ${data.page}, total lines: ${data.total}</p>
+    <pre>${data.lines.join('\n')}</pre>
+  `;
+}
+
+async function renderDiag(){
+  const list = await api('/api/channels');
+  let html = `<h2>Diagnostics</h2><button onclick="generateStable()">Generate stable playlist</button><button onclick="renderDiag()">Refresh</button>`;
+  html += `<table><tr><th>Channel</th><th>Status</th><th>HTTP</th><th>ffprobe</th><th>Last check</th><th>Action</th></tr>`;
+  for(const c of list.channels){
+    const d = c.diagnostic;
+    const status = d ? (d.ok ? 'OK' : 'FAIL') : '-';
+    html += `<tr>
+      <td>${c.name}</td>
+      <td class="${status==='OK'?'ok':'fail'}">${status}</td>
+      <td>${d?.http_code ?? '-'}</td>
+      <td>${d?.ffprobe_ok === true ? 'audio+video' : (d?.ffprobe_summary || '-')}</td>
+      <td>${d?new Date(d.checked_at*1000).toLocaleString():'-'}</td>
+      <td><button onclick="testChannel('${c.channel_id}')">Test now</button></td>
+    </tr>`;
+  }
+  html += `</table><p>Stable URL: <code>/pluto_stable.m3u</code></p>`;
+  document.getElementById('diag').innerHTML = html;
+}
+
+async function testChannel(id){
+  await api(`/api/channels/${id}/test`, {method:'POST'});
+  await renderDiag();
+}
+
+async function generateStable(){
+  const r = await api('/api/stable-playlist/generate', {method:'POST'});
+  alert(`Stable playlist generated with ${r.stable_channels} channels`);
+}
+
+async function init(){
+  await renderDashboard();
+  await renderSettings();
+  await renderLogs();
+  await renderDiag();
+}
+init();
+</script>
+</body>
+</html>
