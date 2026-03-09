@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
-APP_VERSION = "0.2.0"
+APP_VERSION = "0.3.0"
 DATA_DIR = Path(os.getenv("PLUTO_GATEWAY_DATA_DIR", "/data"))
 CONFIG_PATH = DATA_DIR / "config.json"
 STABLE_M3U_PATH = DATA_DIR / "pluto_stable.m3u"
@@ -24,6 +24,7 @@ DIAG_STATE_PATH = DATA_DIR / "diagnostics.json"
 UI_START_TIME = time.time()
 PLUTO_SERVICE = os.getenv("PLUTO_SERVICE_NAME", "plutotv")
 AUTO_STABLE_INTERVAL_S = 86400
+UI_PORT = int(os.getenv("PLUTO_UI_PORT", "8080"))
 
 
 class GatewayConfig(BaseModel):
@@ -367,8 +368,9 @@ async def api_status() -> dict[str, Any]:
         "checks": {"m3u": m3u_health, "epg": epg_health},
         "ports": {
             "query_ok": ss_rc == 0,
-            "listeners": [line for line in ss_out.splitlines() if ":9000" in line or ":8788" in line][:20],
+            "listeners": [line for line in ss_out.splitlines() if f":{cfg.port}" in line or f":{UI_PORT}" in line][:20],
         },
+        "ui_port": UI_PORT,
         "ui_uptime_seconds": int(now_ts() - UI_START_TIME),
         "last_diagnostics_update": load_diag_state().get("updated_at"),
     }
@@ -463,6 +465,34 @@ async def pluto_stable() -> PlainTextResponse:
     if not STABLE_M3U_PATH.exists():
         raise HTTPException(status_code=404, detail="stable playlist not generated yet")
     return PlainTextResponse(STABLE_M3U_PATH.read_text(encoding="utf-8"), media_type="audio/x-mpegurl")
+
+
+@app.get("/tvheadend")
+async def passthrough_tvheadend(region: str = "DE") -> PlainTextResponse:
+    cfg = load_config()
+    url = f"{pluto_base_url(cfg)}/tvheadend?region={region}"
+    try:
+        async with httpx.AsyncClient(timeout=25.0, follow_redirects=True) as client:
+            resp = await client.get(url, headers=build_headers(cfg))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"pluto upstream error: {exc}") from exc
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=resp.status_code, detail=resp.text[:500])
+    return PlainTextResponse(resp.text, media_type="audio/x-mpegurl")
+
+
+@app.get("/epg")
+async def passthrough_epg() -> PlainTextResponse:
+    cfg = load_config()
+    url = f"{pluto_base_url(cfg)}/epg"
+    try:
+        async with httpx.AsyncClient(timeout=25.0, follow_redirects=True) as client:
+            resp = await client.get(url, headers=build_headers(cfg))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"pluto upstream error: {exc}") from exc
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=resp.status_code, detail=resp.text[:500])
+    return PlainTextResponse(resp.text, media_type="application/xml")
 
 
 @app.get("/api/network")
