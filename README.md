@@ -60,11 +60,13 @@ git checkout <branch-name>
 
 ### 3) Gateway installieren
 ```bash
-./install.sh
+./setup.sh
 ```
 
-Wenn du stattdessen direkt das Unter-Script aufrufen willst, geht auch:
+Alternative Aufrufe (falls gewünscht):
 ```bash
+./install.sh
+# oder direkt
 ./scripts/install.sh
 ```
 
@@ -138,7 +140,7 @@ curl -I http://127.0.0.1:8788/pluto_stable.m3u
 ```bash
 cd /opt/tvhub
 git pull
-./install.sh
+./setup.sh
 systemctl restart pluto-gateway-ui
 ```
 
@@ -183,8 +185,8 @@ rm -rf /data/config.json /data/diagnostics.json /data/pluto_stable.m3u
   ls -la
   git status
   git pull
-  chmod +x install.sh scripts/install.sh
-  ./install.sh
+  chmod +x setup.sh install.sh scripts/install.sh
+  ./setup.sh
   ```
   Falls `scripts/` fehlt, war der Clone unvollständig oder du bist im falschen Ordner.
 
