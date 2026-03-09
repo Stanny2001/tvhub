@@ -1,0 +1,15 @@
+[Unit]
+Description=Pluto Gateway UI (FastAPI)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/pluto-gateway-ui
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/pluto-gateway-ui/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8788
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
