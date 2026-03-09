@@ -4,9 +4,12 @@ After=network.target
 
 [Service]
 Type=simple
-User=root
+User=plutogw
+Group=plutogw
 WorkingDirectory=/opt/pluto-gateway-ui
 Environment=PYTHONUNBUFFERED=1
+Environment=PLUTO_GATEWAY_DATA_DIR=/data
+Environment=PLUTO_SERVICE_NAME=plutotv
 ExecStart=/opt/pluto-gateway-ui/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8788
 Restart=always
 RestartSec=3
